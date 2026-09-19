@@ -1,0 +1,1800 @@
+--[[
+    ENDER HUB (v3.2 — corrigido)
+    UI Designer: Loved Filho
+    Script Maker: Dreyko
+    Script Developer: teddy
+    Biblioteca: WindUI
+]]
+
+print("[EnderHub] ▶ Iniciando script...")
+
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
+local Players      = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService   = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
+
+print("[EnderHub] ▶ Nick:", LocalPlayer.Name)
+
+------------------------------------------------------------
+-- GLOBAIS SEGUROS (getgenv com fallback pra _G)
+------------------------------------------------------------
+local GlobalStore = {}
+local function SetGlobal(key, value)
+    GlobalStore[key] = value
+    pcall(function() getgenv()[key] = value end)
+    pcall(function() _G[key] = value end)
+end
+
+local function GetGlobal(key)
+    if GlobalStore[key] ~= nil then return GlobalStore[key] end
+    local v
+    pcall(function() v = getgenv()[key] end)
+    if v ~= nil then return v end
+    pcall(function() v = _G[key] end)
+    return v
+end
+
+------------------------------------------------------------
+-- FONTES
+------------------------------------------------------------
+local FontBold, FontMedium, FontRegular
+do
+    local okB, rB = pcall(function() return Font.fromEnum(Enum.Font.GothamBold) end)
+    FontBold = okB and rB or Enum.Font.GothamBold
+    local okM, rM = pcall(function() return Font.fromEnum(Enum.Font.GothamMedium) end)
+    FontMedium = okM and rM or Enum.Font.GothamMedium
+    local okR, rR = pcall(function() return Font.fromEnum(Enum.Font.Gotham) end)
+    FontRegular = okR and rR or Enum.Font.Gotham
+end
+
+------------------------------------------------------------
+-- PALETA / HELPERS
+------------------------------------------------------------
+local Accent      = Color3.fromHex("#30ff6a")
+local AccentSoft  = Color3.fromHex("#8dffb3")
+local Danger      = Color3.fromRGB(255, 70, 80)
+local Warn        = Color3.fromHex("#ffcc30")
+local BgDark      = Color3.fromRGB(14, 16, 20)
+local BgDarker    = Color3.fromRGB(10, 12, 15)
+
+local DISCORD_HANDLE = "ondasleves811"
+local TIKTOK_HANDLE  = "Lovedfilhoacc2"
+
+local function Tween(obj, time, props, style, dir)
+    local info = TweenInfo.new(time or 0.3, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out)
+    local t = TweenService:Create(obj, info, props)
+    t:Play()
+    return t
+end
+
+local function AddCorner(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = radius or UDim.new(0, 10)
+    c.Parent = parent
+    return c
+end
+
+local function AddStroke(parent, color, thickness, transparency)
+    local s = Instance.new("UIStroke")
+    s.Color = color or Accent
+    s.Thickness = thickness or 1.5
+    s.Transparency = transparency or 0.2
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    s.Parent = parent
+    return s
+end
+
+local function CopyToClipboard(text)
+    local ok = pcall(function()
+        if setclipboard then
+            setclipboard(text)
+        elseif toclipboard then
+            toclipboard(text)
+        else
+            error("Executor sem setclipboard")
+        end
+    end)
+    return ok
+end
+
+print("[EnderHub] ▶ Helpers carregados")
+
+------------------------------------------------------------
+-- WHITELIST
+------------------------------------------------------------
+local WhitelistNicks = {
+    "Titozio77",
+    "rip_teste113",
+    "Storksa_777",
+}
+table.insert(WhitelistNicks, LocalPlayer.Name)
+
+local function IsPlayerWhitelisted()
+    local me = string.lower(LocalPlayer.Name)
+    for _, name in ipairs(WhitelistNicks) do
+        if me == string.lower((tostring(name):gsub("%s+", ""))) then
+            return true
+        end
+    end
+    return false
+end
+
+------------------------------------------------------------
+-- NOTIFICAÇÃO DE KICK
+------------------------------------------------------------
+local function ShowNotWhitelistedNotification(onComplete)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "EnderHub_KickNotify"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 9999
+    gui.Parent = PlayerGui
+
+    local backdrop = Instance.new("Frame")
+    backdrop.Size = UDim2.fromScale(1, 1)
+    backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    backdrop.BackgroundTransparency = 1
+    backdrop.BorderSizePixel = 0
+    backdrop.Parent = gui
+    Tween(backdrop, 0.5, { BackgroundTransparency = 0.45 })
+
+    local card = Instance.new("Frame")
+    card.Size = UDim2.fromOffset(420, 160)
+    card.Position = UDim2.new(0.5, 0, 0.55, 0)
+    card.AnchorPoint = Vector2.new(0.5, 0.5)
+    card.BackgroundColor3 = BgDarker
+    card.BackgroundTransparency = 1
+    card.BorderSizePixel = 0
+    card.Parent = gui
+    AddCorner(card, UDim.new(0, 14))
+
+    local stroke = AddStroke(card, Danger, 1.8, 1)
+
+    local strip = Instance.new("Frame")
+    strip.Size = UDim2.new(1, 0, 0, 4)
+    strip.Position = UDim2.fromOffset(0, 0)
+    strip.BackgroundColor3 = Danger
+    strip.BorderSizePixel = 0
+    strip.BackgroundTransparency = 1
+    strip.Parent = card
+    AddCorner(strip, UDim.new(0, 4))
+
+    local iconBg = Instance.new("Frame")
+    iconBg.Size = UDim2.fromOffset(64, 64)
+    iconBg.Position = UDim2.new(0, 20, 0.5, -32)
+    iconBg.BackgroundColor3 = Danger
+    iconBg.BackgroundTransparency = 1
+    iconBg.BorderSizePixel = 0
+    iconBg.Parent = card
+    AddCorner(iconBg, UDim.new(1, 0))
+
+    local skull = Instance.new("TextLabel")
+    skull.BackgroundTransparency = 1
+    skull.Size = UDim2.fromScale(1, 1)
+    skull.Text = "☠"
+    skull.TextColor3 = Color3.fromRGB(255, 255, 255)
+    skull.TextSize = 34
+    skull.TextTransparency = 1
+    skull.FontFace = FontBold
+    skull.Parent = iconBg
+
+    local title = Instance.new("TextLabel")
+    title.BackgroundTransparency = 1
+    title.Size = UDim2.new(1, -110, 0, 22)
+    title.Position = UDim2.fromOffset(100, 28)
+    title.Text = "ACESSO NEGADO"
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.TextColor3 = Danger
+    title.TextTransparency = 1
+    title.TextSize = 18
+    title.FontFace = FontBold
+    title.Parent = card
+
+    local desc = Instance.new("TextLabel")
+    desc.BackgroundTransparency = 1
+    desc.Size = UDim2.new(1, -110, 0, 60)
+    desc.Position = UDim2.fromOffset(100, 54)
+    desc.Text = "Seu nick não está na whitelist do Ender Hub.\nVocê será desconectado em instantes..."
+    desc.TextXAlignment = Enum.TextXAlignment.Left
+    desc.TextYAlignment = Enum.TextYAlignment.Top
+    desc.TextColor3 = Color3.fromRGB(200, 200, 205)
+    desc.TextTransparency = 1
+    desc.TextSize = 13
+    desc.TextWrapped = true
+    desc.FontFace = FontMedium
+    desc.Parent = card
+
+    Tween(card, 0.55, { BackgroundTransparency = 0.02, Position = UDim2.new(0.5, 0, 0.5, 0) }, Enum.EasingStyle.Back)
+    Tween(stroke, 0.5, { Transparency = 0.3 })
+    Tween(strip, 0.5, { BackgroundTransparency = 0 })
+    Tween(iconBg, 0.5, { BackgroundTransparency = 0.15 })
+    Tween(skull, 0.5, { TextTransparency = 0 })
+    Tween(title, 0.5, { TextTransparency = 0 })
+    Tween(desc, 0.6, { TextTransparency = 0 })
+
+    task.spawn(function()
+        task.wait(0.5)
+        local base = card.Position
+        for _ = 1, 6 do
+            card.Position = base + UDim2.fromOffset(math.random(-3, 3), 0)
+            task.wait(0.03)
+        end
+        card.Position = base
+    end)
+
+    task.spawn(function()
+        while gui.Parent do
+            Tween(strip, 0.35, { BackgroundTransparency = 0.4 })
+            task.wait(0.4)
+            if not gui.Parent then break end
+            Tween(strip, 0.35, { BackgroundTransparency = 0 })
+            task.wait(0.4)
+        end
+    end)
+
+    task.wait(3.8)
+
+    local fadeOut = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+    TweenService:Create(card, fadeOut, { BackgroundTransparency = 1, Position = UDim2.new(0.5, 0, 0.55, 0) }):Play()
+    TweenService:Create(backdrop, fadeOut, { BackgroundTransparency = 1 }):Play()
+    TweenService:Create(stroke, fadeOut, { Transparency = 1 }):Play()
+    TweenService:Create(strip, fadeOut, { BackgroundTransparency = 1 }):Play()
+    TweenService:Create(iconBg, fadeOut, { BackgroundTransparency = 1 }):Play()
+    TweenService:Create(skull, fadeOut, { TextTransparency = 1 }):Play()
+    TweenService:Create(title, fadeOut, { TextTransparency = 1 }):Play()
+    local lastT = TweenService:Create(desc, fadeOut, { TextTransparency = 1 })
+    lastT:Play()
+    lastT.Completed:Wait()
+
+    gui:Destroy()
+    if onComplete then onComplete() end
+end
+
+if not IsPlayerWhitelisted() then
+    ShowNotWhitelistedNotification(function()
+        LocalPlayer:Kick("\n[Ender Hub]\nSeu nick não está na whitelist!")
+    end)
+    return
+end
+
+------------------------------------------------------------
+-- NOTIFICAÇÕES PREMIUM
+------------------------------------------------------------
+local usedSlots = {}
+
+local function TakeSlot()
+    local i = 0
+    while usedSlots[i] do i += 1 end
+    usedSlots[i] = true
+    return i
+end
+
+local function CustomNotify(opts)
+    opts = opts or {}
+    local title    = opts.Title or "Ender Hub"
+    local content  = opts.Content or ""
+    local icon     = opts.Icon or "🔔"
+    local duration = opts.Duration or 4
+    local accent   = opts.Color or Accent
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "EnderHub_Notify"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 2000
+    gui.Parent = PlayerGui
+
+    local slot = TakeSlot()
+    local yPos = 20 + slot * 96
+
+    local card = Instance.new("TextButton")
+    card.AutoButtonColor = false
+    card.Text = ""
+    card.Size = UDim2.fromOffset(340, 86)
+    card.AnchorPoint = Vector2.new(0, 0)
+    card.Position = UDim2.new(1, 20, 0, yPos)
+    card.BackgroundColor3 = BgDarker
+    card.BackgroundTransparency = 0.02
+    card.BorderSizePixel = 0
+    card.Parent = gui
+    AddCorner(card, UDim.new(0, 12))
+
+    local stroke = AddStroke(card, accent, 1.4, 0.35)
+
+    local sideBg = Instance.new("Frame")
+    sideBg.Size = UDim2.new(0, 4, 1, -16)
+    sideBg.Position = UDim2.fromOffset(8, 8)
+    sideBg.BackgroundColor3 = Color3.fromRGB(40, 42, 48)
+    sideBg.BorderSizePixel = 0
+    sideBg.Parent = card
+    AddCorner(sideBg, UDim.new(1, 0))
+
+    local sideFill = Instance.new("Frame")
+    sideFill.Size = UDim2.new(1, 0, 1, 0)
+    sideFill.BackgroundColor3 = accent
+    sideFill.BorderSizePixel = 0
+    sideFill.Parent = sideBg
+    AddCorner(sideFill, UDim.new(1, 0))
+
+    local iconCircle = Instance.new("Frame")
+    iconCircle.Size = UDim2.fromOffset(46, 46)
+    iconCircle.Position = UDim2.fromOffset(22, 20)
+    iconCircle.BackgroundColor3 = accent
+    iconCircle.BackgroundTransparency = 0.82
+    iconCircle.BorderSizePixel = 0
+    iconCircle.Parent = card
+    AddCorner(iconCircle, UDim.new(1, 0))
+    AddStroke(iconCircle, accent, 1, 0.5)
+
+    local iconLabel = Instance.new("TextLabel")
+    iconLabel.BackgroundTransparency = 1
+    iconLabel.Size = UDim2.fromScale(1, 1)
+    iconLabel.Text = icon
+    iconLabel.TextSize = 22
+    iconLabel.Parent = iconCircle
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Size = UDim2.new(1, -90, 0, 20)
+    titleLabel.Position = UDim2.fromOffset(78, 16)
+    titleLabel.Text = title
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.TextColor3 = accent
+    titleLabel.TextSize = 15
+    titleLabel.FontFace = FontBold
+    titleLabel.Parent = card
+
+    local descLabel = Instance.new("TextLabel")
+    descLabel.BackgroundTransparency = 1
+    descLabel.Size = UDim2.new(1, -92, 0, 42)
+    descLabel.Position = UDim2.fromOffset(78, 36)
+    descLabel.Text = content
+    descLabel.TextWrapped = true
+    descLabel.TextXAlignment = Enum.TextXAlignment.Left
+    descLabel.TextYAlignment = Enum.TextYAlignment.Top
+    descLabel.TextColor3 = Color3.fromRGB(190, 192, 198)
+    descLabel.TextSize = 12
+    descLabel.FontFace = FontMedium
+    descLabel.Parent = card
+
+    local closeX = Instance.new("TextButton")
+    closeX.BackgroundTransparency = 1
+    closeX.Size = UDim2.fromOffset(24, 24)
+    closeX.Position = UDim2.new(1, -30, 0, 8)
+    closeX.Text = "✕"
+    closeX.TextColor3 = Color3.fromRGB(150, 150, 155)
+    closeX.TextSize = 14
+    closeX.FontFace = FontBold
+    closeX.TextTransparency = 1
+    closeX.AutoButtonColor = false
+    closeX.Parent = card
+
+    local targetPos = UDim2.new(1, -360, 0, yPos)
+    Tween(card, 0.45, { Position = targetPos }, Enum.EasingStyle.Back)
+    Tween(sideFill, duration, { Size = UDim2.new(1, 0, 0, 0) }, Enum.EasingStyle.Linear)
+
+    card.MouseEnter:Connect(function()
+        Tween(card, 0.2, { Size = UDim2.fromOffset(344, 88), Position = UDim2.new(1, -362, 0, yPos - 2) })
+        Tween(closeX, 0.2, { TextTransparency = 0 })
+        Tween(iconCircle, 0.2, { BackgroundTransparency = 0.6 })
+    end)
+    card.MouseLeave:Connect(function()
+        Tween(card, 0.2, { Size = UDim2.fromOffset(340, 86), Position = targetPos })
+        Tween(closeX, 0.2, { TextTransparency = 1 })
+        Tween(iconCircle, 0.2, { BackgroundTransparency = 0.82 })
+    end)
+
+    local closed = false
+    local function close()
+        if closed then return end
+        closed = true
+        local outT = TweenService:Create(card, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+            Position = UDim2.new(1, 20, 0, yPos),
+            BackgroundTransparency = 1,
+        })
+        outT:Play()
+        TweenService:Create(descLabel, TweenInfo.new(0.3), { TextTransparency = 1 }):Play()
+        TweenService:Create(titleLabel, TweenInfo.new(0.3), { TextTransparency = 1 }):Play()
+        TweenService:Create(iconLabel, TweenInfo.new(0.3), { TextTransparency = 1 }):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.3), { Transparency = 1 }):Play()
+        outT.Completed:Wait()
+        usedSlots[slot] = nil
+        if gui and gui.Parent then gui:Destroy() end
+    end
+
+    card.MouseButton1Click:Connect(close)
+    closeX.MouseButton1Click:Connect(close)
+    task.delay(duration, close)
+end
+
+------------------------------------------------------------
+-- POPUP WHITELIST
+------------------------------------------------------------
+local function ShowWhitelistPrompt(onAnswer)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "EnderHub_Whitelist"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 3000
+    gui.Parent = PlayerGui
+
+    local overlay = Instance.new("Frame")
+    overlay.Size = UDim2.fromScale(1, 1)
+    overlay.BackgroundColor3 = Color3.fromRGB(4, 6, 9)
+    overlay.BackgroundTransparency = 1
+    overlay.BorderSizePixel = 0
+    overlay.Parent = gui
+    Tween(overlay, 0.4, { BackgroundTransparency = 0.15 })
+
+    local glow = Instance.new("Frame")
+    glow.Size = UDim2.fromOffset(500, 300)
+    glow.Position = UDim2.fromScale(0.5, 0.5)
+    glow.AnchorPoint = Vector2.new(0.5, 0.5)
+    glow.BackgroundColor3 = Accent
+    glow.BackgroundTransparency = 0.88
+    glow.BorderSizePixel = 0
+    glow.ZIndex = 0
+    glow.Parent = overlay
+    AddCorner(glow, UDim.new(0, 200))
+
+    local card = Instance.new("Frame")
+    card.Size = UDim2.fromOffset(440, 280)
+    card.Position = UDim2.fromScale(0.5, 0.5)
+    card.AnchorPoint = Vector2.new(0.5, 0.5)
+    card.BackgroundColor3 = Color3.fromRGB(15, 18, 24)
+    card.BackgroundTransparency = 0.02
+    card.BorderSizePixel = 0
+    card.ZIndex = 1
+    card.Parent = overlay
+    AddCorner(card, UDim.new(0, 16))
+    AddStroke(card, Accent, 1.8, 0.35)
+
+    local iconCircle = Instance.new("Frame")
+    iconCircle.Size = UDim2.fromOffset(70, 70)
+    iconCircle.Position = UDim2.new(0.5, 0, 0, -35)
+    iconCircle.AnchorPoint = Vector2.new(0.5, 0)
+    iconCircle.BackgroundColor3 = BgDarker
+    iconCircle.BorderSizePixel = 0
+    iconCircle.ZIndex = 2
+    iconCircle.Parent = card
+    AddCorner(iconCircle, UDim.new(1, 0))
+    AddStroke(iconCircle, Accent, 2, 0.15)
+
+    local bio = Instance.new("TextLabel")
+    bio.BackgroundTransparency = 1
+    bio.Size = UDim2.fromScale(1, 1)
+    bio.Text = "☣"
+    bio.TextColor3 = Accent
+    bio.TextSize = 36
+    bio.FontFace = FontBold
+    bio.Parent = iconCircle
+
+    local title = Instance.new("TextLabel")
+    title.BackgroundTransparency = 1
+    title.Size = UDim2.new(1, -40, 0, 30)
+    title.Position = UDim2.fromOffset(20, 50)
+    title.Text = "ENDER HUB"
+    title.TextColor3 = Accent
+    title.TextSize = 22
+    title.FontFace = FontBold
+    title.Parent = card
+
+    local subtitle = Instance.new("TextLabel")
+    subtitle.BackgroundTransparency = 1
+    subtitle.Size = UDim2.new(1, -40, 0, 18)
+    subtitle.Position = UDim2.fromOffset(20, 80)
+    subtitle.Text = "• WHITELIST CONFIRMADA •"
+    subtitle.TextColor3 = Color3.fromRGB(150, 150, 155)
+    subtitle.TextSize = 11
+    subtitle.FontFace = FontMedium
+    subtitle.Parent = card
+
+    local divider = Instance.new("Frame")
+    divider.Size = UDim2.new(1, -48, 0, 1)
+    divider.Position = UDim2.fromOffset(24, 110)
+    divider.BackgroundColor3 = Color3.fromRGB(40, 44, 50)
+    divider.BorderSizePixel = 0
+    divider.Parent = card
+
+    local desc = Instance.new("TextLabel")
+    desc.BackgroundTransparency = 1
+    desc.Size = UDim2.new(1, -48, 0, 50)
+    desc.Position = UDim2.fromOffset(24, 124)
+    desc.Text = "Seu nick foi autorizado na whitelist do Ender Hub.\nEscolha SIM para carregar o script ou NÃO para sair."
+    desc.TextColor3 = Color3.fromRGB(200, 205, 212)
+    desc.TextSize = 13
+    desc.TextWrapped = true
+    desc.TextYAlignment = Enum.TextYAlignment.Top
+    desc.FontFace = FontMedium
+    desc.Parent = card
+
+    local function makeButton(text, color, position, isPrimary)
+        local btn = Instance.new("TextButton")
+        btn.AutoButtonColor = false
+        btn.Size = UDim2.fromOffset(180, 46)
+        btn.Position = position
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextSize = 15
+        btn.FontFace = FontBold
+        btn.BackgroundColor3 = color
+        btn.BorderSizePixel = 0
+        btn.Parent = card
+        AddCorner(btn, UDim.new(0, 10))
+        if isPrimary then AddStroke(btn, Accent, 1.5, 0.4) end
+
+        btn.MouseEnter:Connect(function()
+            Tween(btn, 0.15, { Size = UDim2.fromOffset(184, 48), Position = position - UDim2.fromOffset(2, 1) })
+        end)
+        btn.MouseLeave:Connect(function()
+            Tween(btn, 0.15, { Size = UDim2.fromOffset(180, 46), Position = position })
+        end)
+        return btn
+    end
+
+    local yesButton = makeButton("SIM, ENTRAR", Color3.fromHex("#1eaa52"), UDim2.fromOffset(30, 200), true)
+    local noButton  = makeButton("NÃO, SAIR", Color3.fromRGB(140, 40, 52), UDim2.fromOffset(230, 200), false)
+
+    card.Size = UDim2.fromOffset(0, 0)
+    Tween(card, 0.5, { Size = UDim2.fromOffset(440, 280) }, Enum.EasingStyle.Back)
+
+    task.spawn(function()
+        while gui.Parent do
+            Tween(bio, 1.2, { TextColor3 = AccentSoft }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(1.2)
+            if not gui.Parent then break end
+            Tween(bio, 1.2, { TextColor3 = Accent }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(1.2)
+        end
+    end)
+
+    local answered = false
+    local function answer(value)
+        if answered then return end
+        answered = true
+        Tween(card, 0.25, { Size = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        task.wait(0.25)
+        if gui and gui.Parent then gui:Destroy() end
+        onAnswer(value)
+    end
+    yesButton.MouseButton1Click:Connect(function() answer(true) end)
+    noButton.MouseButton1Click:Connect(function() answer(false) end)
+end
+
+------------------------------------------------------------
+-- POPUP PRIMEIRA VEZ (contatos dos donos)
+------------------------------------------------------------
+local function ShowFirstRunPrompt(onAnswer)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "EnderHub_FirstRun"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 3500
+    gui.Parent = PlayerGui
+
+    local overlay = Instance.new("Frame")
+    overlay.Size = UDim2.fromScale(1, 1)
+    overlay.BackgroundColor3 = Color3.fromRGB(4, 6, 9)
+    overlay.BackgroundTransparency = 1
+    overlay.BorderSizePixel = 0
+    overlay.Parent = gui
+    Tween(overlay, 0.4, { BackgroundTransparency = 0.25 })
+
+    local glow = Instance.new("Frame")
+    glow.Size = UDim2.fromOffset(520, 320)
+    glow.Position = UDim2.fromScale(0.5, 0.5)
+    glow.AnchorPoint = Vector2.new(0.5, 0.5)
+    glow.BackgroundColor3 = Accent
+    glow.BackgroundTransparency = 0.9
+    glow.BorderSizePixel = 0
+    glow.ZIndex = 0
+    glow.Parent = overlay
+    AddCorner(glow, UDim.new(0, 220))
+
+    local card = Instance.new("Frame")
+    card.Size = UDim2.fromOffset(460, 300)
+    card.Position = UDim2.fromScale(0.5, 0.5)
+    card.AnchorPoint = Vector2.new(0.5, 0.5)
+    card.BackgroundColor3 = Color3.fromRGB(15, 18, 24)
+    card.BackgroundTransparency = 0.02
+    card.BorderSizePixel = 0
+    card.ZIndex = 1
+    card.Parent = overlay
+    AddCorner(card, UDim.new(0, 16))
+    AddStroke(card, Accent, 1.8, 0.35)
+
+    local iconCircle = Instance.new("Frame")
+    iconCircle.Size = UDim2.fromOffset(70, 70)
+    iconCircle.Position = UDim2.new(0.5, 0, 0, -35)
+    iconCircle.AnchorPoint = Vector2.new(0.5, 0)
+    iconCircle.BackgroundColor3 = BgDarker
+    iconCircle.BorderSizePixel = 0
+    iconCircle.ZIndex = 2
+    iconCircle.Parent = card
+    AddCorner(iconCircle, UDim.new(1, 0))
+    AddStroke(iconCircle, Accent, 2, 0.15)
+
+    local icon = Instance.new("TextLabel")
+    icon.BackgroundTransparency = 1
+    icon.Size = UDim2.fromScale(1, 1)
+    icon.Text = "💬"
+    icon.TextColor3 = Accent
+    icon.TextSize = 34
+    icon.FontFace = FontBold
+    icon.Parent = iconCircle
+
+    local title = Instance.new("TextLabel")
+    title.BackgroundTransparency = 1
+    title.Size = UDim2.new(1, -40, 0, 30)
+    title.Position = UDim2.fromOffset(20, 50)
+    title.Text = "TEM DÚVIDAS?"
+    title.TextColor3 = Accent
+    title.TextSize = 22
+    title.FontFace = FontBold
+    title.Parent = card
+
+    local subtitle = Instance.new("TextLabel")
+    subtitle.BackgroundTransparency = 1
+    subtitle.Size = UDim2.new(1, -40, 0, 18)
+    subtitle.Position = UDim2.fromOffset(20, 80)
+    subtitle.Text = "• CONTATOS DOS DONOS •"
+    subtitle.TextColor3 = Color3.fromRGB(150, 150, 155)
+    subtitle.TextSize = 11
+    subtitle.FontFace = FontMedium
+    subtitle.Parent = card
+
+    local divider = Instance.new("Frame")
+    divider.Size = UDim2.new(1, -48, 0, 1)
+    divider.Position = UDim2.fromOffset(24, 110)
+    divider.BackgroundColor3 = Color3.fromRGB(40, 44, 50)
+    divider.BorderSizePixel = 0
+    divider.Parent = card
+
+    local desc = Instance.new("TextLabel")
+    desc.BackgroundTransparency = 1
+    desc.Size = UDim2.new(1, -48, 0, 60)
+    desc.Position = UDim2.fromOffset(24, 124)
+    desc.Text = string.format(
+        "Quer copiar o Discord e o TikTok dos donos?\n\nDiscord: %s\nTikTok: %s",
+        DISCORD_HANDLE, TIKTOK_HANDLE
+    )
+    desc.TextColor3 = Color3.fromRGB(200, 205, 212)
+    desc.TextSize = 13
+    desc.TextWrapped = true
+    desc.TextYAlignment = Enum.TextYAlignment.Top
+    desc.TextXAlignment = Enum.TextXAlignment.Left
+    desc.FontFace = FontMedium
+    desc.Parent = card
+
+    local function makeButton(text, color, position, isPrimary)
+        local btn = Instance.new("TextButton")
+        btn.AutoButtonColor = false
+        btn.Size = UDim2.fromOffset(190, 46)
+        btn.Position = position
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextSize = 14
+        btn.FontFace = FontBold
+        btn.BackgroundColor3 = color
+        btn.BorderSizePixel = 0
+        btn.Parent = card
+        AddCorner(btn, UDim.new(0, 10))
+        if isPrimary then AddStroke(btn, Accent, 1.5, 0.4) end
+
+        btn.MouseEnter:Connect(function()
+            Tween(btn, 0.15, { Size = UDim2.fromOffset(194, 48), Position = position - UDim2.fromOffset(2, 1) })
+        end)
+        btn.MouseLeave:Connect(function()
+            Tween(btn, 0.15, { Size = UDim2.fromOffset(190, 46), Position = position })
+        end)
+        return btn
+    end
+
+    local copyBtn = makeButton("📋 COPIAR", Color3.fromHex("#1eaa52"), UDim2.fromOffset(28, 220), true)
+    local noBtn   = makeButton("NÃO, OBRIGADO", Color3.fromRGB(90, 96, 108), UDim2.fromOffset(242, 220), false)
+
+    card.Size = UDim2.fromOffset(0, 0)
+    Tween(card, 0.5, { Size = UDim2.fromOffset(460, 300) }, Enum.EasingStyle.Back)
+
+    task.spawn(function()
+        while gui.Parent do
+            Tween(icon, 1.2, { TextSize = 40 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(1.2)
+            if not gui.Parent then break end
+            Tween(icon, 1.2, { TextSize = 34 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(1.2)
+        end
+    end)
+
+    local answered = false
+    local function answer(value)
+        if answered then return end
+        answered = true
+        Tween(card, 0.25, { Size = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        task.wait(0.25)
+        if gui and gui.Parent then gui:Destroy() end
+        onAnswer(value)
+    end
+    copyBtn.MouseButton1Click:Connect(function() answer(true) end)
+    noBtn.MouseButton1Click:Connect(function() answer(false) end)
+end
+
+------------------------------------------------------------
+-- TELA DE CARREGAMENTO PREMIUM
+------------------------------------------------------------
+local function ShowLoadingScreen(onDone)
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "EnderHub_Loading"
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+    screenGui.DisplayOrder = 1000
+    screenGui.Parent = PlayerGui
+
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.fromScale(1, 1)
+    bg.BackgroundColor3 = Color3.fromRGB(5, 8, 7)
+    bg.BorderSizePixel = 0
+    bg.Parent = screenGui
+
+    local bgGrad = Instance.new("UIGradient")
+    bgGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(5, 8, 7)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(8, 22, 14)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 8, 7)),
+    })
+    bgGrad.Rotation = 45
+    bgGrad.Parent = bg
+
+    local gridHolder = Instance.new("Frame")
+    gridHolder.Size = UDim2.fromScale(1, 1)
+    gridHolder.BackgroundTransparency = 1
+    gridHolder.ClipsDescendants = true
+    gridHolder.Parent = screenGui
+
+    task.spawn(function()
+        for i = 0, 30 do
+            local line = Instance.new("Frame")
+            line.Size = UDim2.new(0, 1, 1, 0)
+            line.Position = UDim2.new(i / 30, 0, 0, 0)
+            line.BackgroundColor3 = Accent
+            line.BackgroundTransparency = 0.96
+            line.BorderSizePixel = 0
+            line.Parent = gridHolder
+        end
+        for i = 0, 18 do
+            local line = Instance.new("Frame")
+            line.Size = UDim2.new(1, 0, 0, 1)
+            line.Position = UDim2.new(0, 0, i / 18, 0)
+            line.BackgroundColor3 = Accent
+            line.BackgroundTransparency = 0.96
+            line.BorderSizePixel = 0
+            line.Parent = gridHolder
+        end
+    end)
+
+    task.spawn(function()
+        while screenGui and screenGui.Parent do
+            bgGrad.Rotation = (bgGrad.Rotation + 0.3) % 360
+            task.wait(0.03)
+        end
+    end)
+
+    local dustHolder = Instance.new("Frame")
+    dustHolder.Size = UDim2.fromScale(1, 1)
+    dustHolder.BackgroundTransparency = 1
+    dustHolder.ClipsDescendants = true
+    dustHolder.Parent = screenGui
+
+    task.spawn(function()
+        while screenGui and screenGui.Parent do
+            local dot = Instance.new("Frame")
+            local sz = math.random(2, 5)
+            local x = math.random(0, 1000) / 1000
+            dot.Size = UDim2.fromOffset(sz, sz)
+            dot.Position = UDim2.new(x, 0, 1, 10)
+            dot.BackgroundColor3 = Accent
+            dot.BackgroundTransparency = math.random(40, 80) / 100
+            dot.BorderSizePixel = 0
+            dot.Parent = dustHolder
+            AddCorner(dot, UDim.new(1, 0))
+
+            local rise = math.random(35, 65) / 10
+            local t = TweenService:Create(dot, TweenInfo.new(rise, Enum.EasingStyle.Linear), {
+                Position = UDim2.new(x + math.random(-30, 30) / 1000, 0, -0.05, 0),
+                BackgroundTransparency = 1,
+            })
+            t:Play()
+            t.Completed:Connect(function()
+                if dot and dot.Parent then dot:Destroy() end
+            end)
+            task.wait(math.random(3, 7) / 10)
+        end
+    end)
+
+    local ringHolder = Instance.new("Frame")
+    ringHolder.Size = UDim2.fromScale(1, 1)
+    ringHolder.BackgroundTransparency = 1
+    ringHolder.Parent = screenGui
+
+    task.spawn(function()
+        local angle = 0
+        while screenGui and screenGui.Parent do
+            local ring = Instance.new("Frame")
+            ring.Size = UDim2.fromOffset(40, 40)
+            ring.Position = UDim2.new(0.5, math.cos(angle) * 90, 0.42, math.sin(angle) * 90)
+            ring.AnchorPoint = Vector2.new(0.5, 0.5)
+            ring.BackgroundTransparency = 1
+            ring.Rotation = math.deg(angle)
+            ring.Parent = ringHolder
+
+            local st = Instance.new("UIStroke")
+            st.Color = Accent
+            st.Thickness = 1.5
+            st.Transparency = 0.3
+            st.Parent = ring
+            AddCorner(ring, UDim.new(1, 0))
+
+            local t = TweenService:Create(ring, TweenInfo.new(1.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.fromOffset(120, 120),
+            })
+            TweenService:Create(st, TweenInfo.new(1.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Transparency = 1,
+            }):Play()
+            t:Play()
+            t.Completed:Connect(function()
+                if ring and ring.Parent then ring:Destroy() end
+            end)
+
+            angle = angle + math.pi / 3
+            task.wait(0.3)
+        end
+    end)
+
+    local center = Instance.new("Frame")
+    center.Size = UDim2.fromOffset(460, 220)
+    center.Position = UDim2.fromScale(0.5, 0.45)
+    center.AnchorPoint = Vector2.new(0.5, 0.5)
+    center.BackgroundTransparency = 1
+    center.Parent = screenGui
+
+    local orb = Instance.new("Frame")
+    orb.Size = UDim2.fromOffset(140, 140)
+    orb.Position = UDim2.new(0.5, 0, 0, -10)
+    orb.AnchorPoint = Vector2.new(0.5, 0)
+    orb.BackgroundColor3 = Accent
+    orb.BackgroundTransparency = 0.92
+    orb.BorderSizePixel = 0
+    orb.ZIndex = 0
+    orb.Parent = center
+    AddCorner(orb, UDim.new(1, 0))
+
+    task.spawn(function()
+        local sine = TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        while screenGui and screenGui.Parent do
+            TweenService:Create(orb, sine, { BackgroundTransparency = 0.86 }):Play()
+            task.wait(1.4)
+            if not (screenGui and screenGui.Parent) then break end
+            TweenService:Create(orb, sine, { BackgroundTransparency = 0.94 }):Play()
+            task.wait(1.4)
+        end
+    end)
+
+    local icon = Instance.new("TextLabel")
+    icon.BackgroundTransparency = 1
+    icon.Size = UDim2.fromOffset(80, 60)
+    icon.Position = UDim2.new(0.5, 0, 0, 6)
+    icon.AnchorPoint = Vector2.new(0.5, 0)
+    icon.Text = "☣"
+    icon.TextColor3 = Accent
+    icon.TextSize = 54
+    icon.TextTransparency = 1
+    icon.FontFace = FontBold
+    icon.ZIndex = 1
+    icon.Parent = center
+
+    local welcome = Instance.new("TextLabel")
+    welcome.BackgroundTransparency = 1
+    welcome.Size = UDim2.new(1, 0, 0, 20)
+    welcome.Position = UDim2.fromOffset(0, 82)
+    welcome.Text = "B E M - V I N D O   A O"
+    welcome.TextColor3 = Color3.fromRGB(160, 165, 172)
+    welcome.TextSize = 12
+    welcome.TextTransparency = 1
+    welcome.FontFace = FontMedium
+    welcome.Parent = center
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Size = UDim2.new(1, 0, 0, 60)
+    nameLabel.Position = UDim2.fromOffset(0, 104)
+    nameLabel.Text = "ENDER HUB"
+    nameLabel.TextColor3 = Accent
+    nameLabel.TextSize = 48
+    nameLabel.TextTransparency = 1
+    nameLabel.FontFace = FontBold
+    nameLabel.Parent = center
+
+    local nameShadow = nameLabel:Clone()
+    nameShadow.TextTransparency = 1
+    nameShadow.TextSize = 50
+    nameShadow.ZIndex = 0
+    nameShadow.Position = UDim2.fromOffset(0, 105)
+    nameShadow.Parent = center
+
+    local barBg = Instance.new("Frame")
+    barBg.Size = UDim2.new(1, -80, 0, 8)
+    barBg.Position = UDim2.fromOffset(40, 178)
+    barBg.BackgroundColor3 = Color3.fromRGB(30, 34, 32)
+    barBg.BorderSizePixel = 0
+    barBg.ClipsDescendants = true
+    barBg.Parent = center
+    AddCorner(barBg, UDim.new(1, 0))
+
+    local barFill = Instance.new("Frame")
+    barFill.Size = UDim2.new(0, 0, 1, 0)
+    barFill.BackgroundColor3 = Accent
+    barFill.BorderSizePixel = 0
+    barFill.Parent = barBg
+    AddCorner(barFill, UDim.new(1, 0))
+
+    local barGrad = Instance.new("UIGradient")
+    barGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 255, 210)),
+        ColorSequenceKeypoint.new(0.5, Accent),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 255, 210)),
+    })
+    barGrad.Parent = barFill
+
+    task.spawn(function()
+        local off = -1
+        while screenGui and screenGui.Parent do
+            off += 0.03
+            if off > 1 then off = -1 end
+            barGrad.Offset = Vector2.new(off, 0)
+            task.wait(0.02)
+        end
+    end)
+
+    local pct = Instance.new("TextLabel")
+    pct.BackgroundTransparency = 1
+    pct.Size = UDim2.new(1, 0, 0, 16)
+    pct.Position = UDim2.fromOffset(0, 160)
+    pct.Text = "0%"
+    pct.TextColor3 = Accent
+    pct.TextSize = 13
+    pct.FontFace = FontBold
+    pct.TextTransparency = 1
+    pct.Parent = center
+
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Size = UDim2.new(1, 0, 0, 18)
+    statusLabel.Position = UDim2.fromOffset(0, 192)
+    statusLabel.Text = ""
+    statusLabel.TextColor3 = Color3.fromRGB(150, 152, 158)
+    statusLabel.TextSize = 12
+    statusLabel.FontFace = FontMedium
+    statusLabel.TextTransparency = 1
+    statusLabel.Parent = center
+
+    Tween(icon, 0.6, { TextTransparency = 0 }, Enum.EasingStyle.Quint)
+    task.delay(0.15, function()
+        Tween(welcome, 0.5, { TextTransparency = 0 })
+        Tween(pct, 0.5, { TextTransparency = 0 })
+    end)
+    task.delay(0.3, function()
+        Tween(nameLabel, 0.7, { TextTransparency = 0 }, Enum.EasingStyle.Back)
+        Tween(nameShadow, 0.7, { TextTransparency = 0.75 }, Enum.EasingStyle.Back)
+        Tween(statusLabel, 0.5, { TextTransparency = 0 })
+    end)
+
+    task.spawn(function()
+        local sine = TweenInfo.new(1.0, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        while screenGui and screenGui.Parent do
+            TweenService:Create(icon, sine, { TextSize = 60 }):Play()
+            task.wait(1.0)
+            if not (screenGui and screenGui.Parent) then break end
+            TweenService:Create(icon, sine, { TextSize = 54 }):Play()
+            task.wait(1.0)
+        end
+    end)
+
+    local statuses = {
+        "inicializando componentes...",
+        "sincronizando interface...",
+        "carregando recursos visuais...",
+        "preparando personalização...",
+        "quase pronto...",
+    }
+
+    task.spawn(function()
+        for _, text in ipairs(statuses) do
+            if not (screenGui and screenGui.Parent) then break end
+            local typed = ""
+            for i = 1, #text do
+                if not (screenGui and screenGui.Parent) then return end
+                typed = typed .. text:sub(i, i)
+                statusLabel.Text = typed
+                task.wait(0.018)
+            end
+            task.wait(0.55)
+        end
+    end)
+
+    local loadingTime = 3.6
+    local startTime = tick()
+    task.spawn(function()
+        while screenGui and screenGui.Parent do
+            local elapsed = tick() - startTime
+            local p = math.clamp(elapsed / loadingTime, 0, 1)
+            local eased = 1 - (1 - p) ^ 3
+            barFill.Size = UDim2.new(eased, 0, 1, 0)
+            pct.Text = math.floor(eased * 100) .. "%"
+            if p >= 1 then break end
+            task.wait(0.03)
+        end
+    end)
+
+    task.delay(loadingTime, function()
+        if not (screenGui and screenGui.Parent) then
+            pcall(onDone)
+            return
+        end
+
+        local flash = Instance.new("Frame")
+        flash.Size = UDim2.fromScale(1, 1)
+        flash.BackgroundColor3 = Accent
+        flash.BackgroundTransparency = 1
+        flash.BorderSizePixel = 0
+        flash.ZIndex = 50
+        flash.Parent = screenGui
+        Tween(flash, 0.1, { BackgroundTransparency = 0.5 })
+        task.wait(0.1)
+        Tween(flash, 0.4, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quint)
+
+        for i = 1, 24 do
+            local spark = Instance.new("Frame")
+            local sz = math.random(4, 10)
+            spark.Size = UDim2.fromOffset(sz, sz)
+            spark.Position = UDim2.fromScale(0.5, 0.42)
+            spark.AnchorPoint = Vector2.new(0.5, 0.5)
+            spark.BackgroundColor3 = Accent
+            spark.BorderSizePixel = 0
+            spark.ZIndex = 51
+            spark.Parent = screenGui
+            AddCorner(spark, UDim.new(1, 0))
+
+            local ang = (i / 24) * math.pi * 2
+            local dist = math.random(180, 320)
+            local st = TweenService:Create(spark, TweenInfo.new(0.7, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                Position = UDim2.new(0.5, math.cos(ang) * dist, 0.42, math.sin(ang) * dist),
+                BackgroundTransparency = 1,
+                Size = UDim2.fromOffset(2, 2),
+            })
+            st:Play()
+            st.Completed:Connect(function()
+                if spark and spark.Parent then spark:Destroy() end
+            end)
+        end
+
+        local fo = TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+        TweenService:Create(bg, fo, { BackgroundTransparency = 1 }):Play()
+        TweenService:Create(gridHolder, fo, { BackgroundTransparency = 1 }):Play()
+        TweenService:Create(nameLabel, fo, { TextTransparency = 1 }):Play()
+        TweenService:Create(nameShadow, fo, { TextTransparency = 1 }):Play()
+        TweenService:Create(welcome, fo, { TextTransparency = 1 }):Play()
+        TweenService:Create(statusLabel, fo, { TextTransparency = 1 }):Play()
+        TweenService:Create(pct, fo, { TextTransparency = 1 }):Play()
+        TweenService:Create(icon, fo, { TextTransparency = 1 }):Play()
+        TweenService:Create(orb, fo, { BackgroundTransparency = 1 }):Play()
+        local ff = TweenService:Create(barFill, fo, { BackgroundTransparency = 1 })
+        ff:Play()
+        ff.Completed:Wait()
+
+        if screenGui and screenGui.Parent then screenGui:Destroy() end
+        pcall(onDone)
+    end)
+end
+
+------------------------------------------------------------
+-- SISTEMA DE SAVE
+------------------------------------------------------------
+local SAVE_FOLDER = "EnderHub"
+local SAVE_FILE_WHITELIST = SAVE_FOLDER .. "/whitelist_aceita.txt"
+local SAVE_FILE_FIRSTRUN  = SAVE_FOLDER .. "/primeira_execucao.txt"
+local saveKey = tostring(LocalPlayer.UserId)
+
+local function EnsureFolder()
+    pcall(function()
+        if makefolder and isfolder and not isfolder(SAVE_FOLDER) then
+            makefolder(SAVE_FOLDER)
+        end
+    end)
+end
+
+local function HasAcceptedBefore()
+    local env = GetGlobal("EnderHub_Aceito")
+    if env == saveKey then return true end
+    local ok, c = pcall(function()
+        if isfile and readfile and isfile(SAVE_FILE_WHITELIST) then return readfile(SAVE_FILE_WHITELIST) end
+    end)
+    return ok and c == saveKey
+end
+
+local function SaveAccepted()
+    EnsureFolder()
+    SetGlobal("EnderHub_Aceito", saveKey)
+    pcall(function()
+        if writefile then writefile(SAVE_FILE_WHITELIST, saveKey) end
+    end)
+end
+
+local function HasFirstRunBeenShown()
+    local env = GetGlobal("EnderHub_PrimeiraVez")
+    if env == saveKey then return true end
+    local ok, c = pcall(function()
+        if isfile and readfile and isfile(SAVE_FILE_FIRSTRUN) then return readfile(SAVE_FILE_FIRSTRUN) end
+    end)
+    return ok and c == saveKey
+end
+
+local function SaveFirstRunShown()
+    EnsureFolder()
+    SetGlobal("EnderHub_PrimeiraVez", saveKey)
+    pcall(function()
+        if writefile then writefile(SAVE_FILE_FIRSTRUN, saveKey) end
+    end)
+end
+
+------------------------------------------------------------
+-- WINDUI LOADER
+------------------------------------------------------------
+local WindUIUrls = {
+    "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua",
+    "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua",
+    "https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/dist/main.lua",
+}
+
+local function LoadWindUI()
+    for _, url in ipairs(WindUIUrls) do
+        local ok, lib = pcall(function()
+            return loadstring(game:HttpGet(url))()
+        end)
+        if ok and lib then
+            print("[EnderHub] ✓ WindUI carregada de: " .. url)
+            return lib
+        end
+        warn("[EnderHub] ✗ Falha WindUI: " .. url .. " | " .. tostring(lib))
+    end
+    return nil
+end
+
+------------------------------------------------------------
+-- LEGENDARY (reutiliza WindUI)
+------------------------------------------------------------
+local function RunLegendary()
+    local WindUI = GetGlobal("EnderHub_WindUI") or LoadWindUI()
+    SetGlobal("EnderHub_WindUI", WindUI)
+    if not WindUI then error("WindUI não disponível para o Legendary Hub") end
+
+    local MainWindow = WindUI:CreateWindow({
+        Title = "ULTRA LENDÁRIO HUB",
+        Icon = "biohazard",
+        Author = "Por Neymar",
+        Folder = "LH",
+        Size = UDim2.fromOffset(580, 460),
+        MinSize = Vector2.new(560, 350),
+        MaxSize = Vector2.new(850, 560),
+        Transparent = false,
+        Theme = "Dark",
+        Resizable = true,
+        SideBarWidth = 200,
+        BackgroundImageTransparency = 0.42,
+        HideSearchBar = true,
+        ScrollBarEnabled = false,
+        User = {
+            Enabled = true,
+            Anonymous = false,
+            Callback = function() print("clicado") end,
+        },
+        KeySystem = {
+            Enabled = true,
+            Key = { "LTZ3-CALV-99GG" },
+            Note = "Peça a Key ao proprietário é de graça!",
+            Thumbnail = {
+                Image = "rbxassetid://88082041597741",
+                Title = "Legendary Hub",
+            },
+            SaveKey = true,
+        },
+    })
+
+    MainWindow:Tag({ Title = "V1", Icon = "", Color = Color3.fromHex("#FFFF00"), Radius = 13 })
+    MainWindow:EditOpenButton({
+        Title = "Legendary Hub",
+        Icon = "biohazard",
+        CornerRadius = UDim.new(0, 8),
+        StrokeThickness = 3,
+        Color = ColorSequence.new(Color3.fromHex("#03ffea"), Color3.fromHex("#009c8f")),
+        OnlyMobile = false,
+        Enabled = true,
+        Draggable = true,
+    })
+
+    local function AddScripts(tab, list)
+        for _, item in ipairs(list) do
+            local cfg = {
+                Title = item[1],
+                Locked = false,
+                Callback = function()
+                    local ok, err = pcall(function()
+                        loadstring(game:HttpGet(item[2]))()
+                    end)
+                    if not ok then
+                        warn("[Legendary] Falha em " .. item[1] .. ": " .. tostring(err))
+                    end
+                end,
+            }
+            if item[3] then cfg.Desc = item[3] end
+            tab:Button(cfg)
+        end
+    end
+
+    local MainTab = MainWindow:Tab({ Title = "Principal", Icon = "house", Locked = false })
+
+    AddScripts(MainTab, {
+        { "Atravessar V12🟣", "https://pastebin.com/raw/GZn1L0PM" },
+        { "Esticar Tela 🖥", "https://pastefy.app/4Sa0uIve/raw" },
+        { "Nova Era Hub💎", "https://pastefy.app/zrszTIQx/raw" },
+        { "Zyck 4.5 🇺🇸", "https://pastefy.app/P2eNOBe2/raw" },
+        { "Slow Otimizer 💍", "https://pastefy.app/tSoOifGr/raw" },
+        { "Script Da Debinha🥀", "https://pastefy.app/9k4tL5Q7/raw" },
+        { "Hotdog V4 🌭", "https://pastefy.app/GzxmSIIn/raw" },
+        { "Tira Analógico 🕹", "https://pastefy.app/AJhzcN5G/raw" },
+        { "Tubaina Hub 🥶", "https://pastefy.app/xLM92mP5/raw" },
+        { "Gui Prime Pro⚽️", "https://pastebin.com/raw/xgkQc7Q9" },
+        { "Atravessar Simples🔥", "https://pastebin.com/raw/D15v30nW" },
+        { "Noclip Injusto + reach bola 900 studs🔥", "https://pastebin.com/raw/hfrDcUm8" },
+        { "Reach The Void🌑", "https://pastebin.com/raw/HyAUVhnP" },
+        { "Passe Forte🦵", "https://pastebin.com/raw/2Yw8Bv85" },
+        { "Brookhaven Ultimate🏡", "https://pastefy.app/Ul55j8hu/raw" },
+        { "K4y The Promission☠️", "https://pastefy.app/Of3pO501/raw" },
+        { "LP Scripts✔️", "https://gist.githubusercontent.com/yesn20456-crypto/af368f3184c1d34a8f4a9e33d4325d0d/raw/60e8309b99f9e002a55005b2d7905a82b90b70f1/gistfile1.txt" },
+        { "Atravessar Zyck + Bola Branca🔮", "https://pastefy.app/UyL8ic0V/raw" },
+        { "Brazilian Panel🇧🇷", "https://pastebin.com/raw/x5XX9kiK" },
+        { "Armando Jr Hub🔥", "https://raw.githubusercontent.com/carlosedut11/ArmadinhoJrPorCantonaJr/refs/heads/main/ArmadinhoJrPorCantonaJr.lua" },
+        { "Water Hub🌊", "https://pastebin.com/raw/Cn805svp" },
+        { "Otimização🚀", "https://raw.githubusercontent.com/Davzxxfixroblox/DavzxHubFixLag/refs/heads/main/FixLagHub" },
+        { "Bola Chiclete⚽️", "https://pastefy.app/ZMHWh8kW/raw" },
+        { "Lag Switch👣", "https://pastefy.app/zZo7yoUB/raw" },
+        { "Bug Do reidorm👑", "https://pastebin.com/raw/qtsDZHGu" },
+        { "Pedrizz Bug⚡️", "https://pastebin.com/raw/28LDYic2" },
+        { "Anti Atravessar Soccer Tool⚽", "https://pastebin.com/raw/LYWJ6sfF" },
+        { "Ping Optimizer🧟‍♂️", "https://pastebin.com/raw/kbHL8MZ5" },
+        { "Brookhaven Optimization🧩", "https://pastebin.com/raw/5DK3dz5Y" },
+        { "Glitch Infinity♾️", "https://pastebin.com/raw/FpPh3UhN" },
+        { "Ghost + Reach👻", "https://pastebin.com/raw/1if0pn7x" },
+        { "Henrique Drible⚡", "https://pastebin.com/raw/wJKBdV8A" },
+        { "Atravessar Tudo👻", "https://pastebin.com/raw/uZ6bvTtF" },
+        { "Script do Kay V2🔥", "https://pastebin.com/raw/eXGuwWWE" },
+        { "Mtzin Pro Max⚡", "https://pastebin.com/raw/kCKEhh99" },
+        { "Painel do Kayne🔥", "https://pastebin.com/raw/Frxjj6my" },
+        { "Kayne Supremo🔥", "https://pastebin.com/raw/xyS7KQdY" },
+        { "Anti Ball Pedra + Atravessar⚽", "https://pastebin.com/raw/Z7eZDEj8" },
+        { "Lucas Hub😈", "https://pastebin.com/raw/xmbL5T3i" },
+        { "Brookhaven Painel V2🏠", "https://pastebin.com/raw/m70Y67h9" },
+        { "GK Hub (Goleiro Deitado)🧤", "https://pastebin.com/raw/FaBkfBHr" },
+        { "Muralha Hub🧱", "https://pastebin.com/raw/UxtmMHm1" },
+        { "Yashin Ultra🧤", "https://pastebin.com/raw/KmNHLYsb" },
+        { "Jvz Bug🥷", "https://pastefy.app/hYyBJna9/raw" },
+        { "Condução Theus⚽", "https://pastefy.app/7FAwfRUX/raw" },
+        { "Reach Do Theus🦿", "https://pastefy.app/tSYVNcwc/raw" },
+        { "Anti Ball Pedra⚽", "https://pastefy.app/59dDHHfr/raw" },
+        { "Football Master V7⚽", "https://pastefy.app/I9nocuO2/raw" },
+        { "Goleiro Hub (Rayfield)🧤", "https://pastefy.app/cogJvYif/raw" },
+        { "Football Master V5 Pro⚽", "https://pastefy.app/77ScQkbz/raw" },
+        { "Theus Hub🍎", "https://pastefy.app/bib1MRS8/raw" },
+        { "Matteo Hub ❄️", "https://pastefy.app/Pvf3lqmJ/raw" },
+        { "Gotto Hub⚽", "https://pastefy.app/EOizRmIz/raw" },
+        { "Loved Hub🍷", "https://pastefy.app/AccDN8CV/raw" },
+        { "Chute Bomba💣", "https://pastefy.app/HeRcZpTg/raw" },
+        { "Painel Spider V2🕷", "https://pastefy.app/LvYw31OO/raw" },
+        { "Angel Hub😇", "https://pastefy.app/679CyrEi/raw" },
+        { "Samuzx Hub🥶", "https://pastefy.app/yOVyrBNy/raw" },
+        { "Brookhaven Panel🏠", "https://pastefy.app/RGPRtmRg/raw" },
+        { "Script do Spider V1🕷", "https://pastefy.app/hutJntDN/raw" },
+        { "Script do Freezer🧊", "https://pastefy.app/bWS31I8q/raw" },
+        { "Papai Cris Menu❤️", "https://pastefy.app/jI58Il0a/raw" },
+        { "Hunk Hub🫂", "https://pastefy.app/ZGDUJNWr/raw" },
+        { "Limpar Tela 💻", "https://pastefy.app/FwY4L6qM/raw", "Só funciona com scripts do Star Hub." },
+        { "DD Osama V5 🇺🇸", "https://pastebin.com/raw/NxpP7iWb" },
+        { "Fuzzy Bugs ♟️", "https://pastefy.app/rsiBF3CL/raw" },
+        { "Anti Roubo Bola ⚽️", "https://pastebin.com/raw/4GXQEjAs", "Key: KWLS" },
+        { "Sixxinho Hub 🔒", "https://raw.githubusercontent.com/josegaviao888-alt/Six-Hub-Privdo/refs/heads/main/Six%20hUB", "Key: SWGK" },
+        { "Reach Forte Do Morales🤣", "https://pastefy.app/ckJb1cXM/raw" },
+        { "Brazilian Panel V2 🇧🇷", "https://pastebin.com/raw/geau1Zy7" },
+        { "Legendary Defender ⚔️", "https://pastebin.com/raw/s91y0AFs" },
+        { "X Hub ❌️", "https://pastefy.app/yXuzlTpQ/raw" },
+        { "Zyck + Mtzin + Soccer + Nova Era Hub 🌈", "https://pastebin.com/fm7nN4KF" },
+    })
+
+    MainTab:Section({ Title = "Atravessar", Icon = "person-walking" })
+    AddScripts(MainTab, { { "Atravessar Theus 👻", "https://pastefy.app/7e1VxPgW/raw" } })
+
+    local SATab = MainWindow:Tab({ Title = "Scripts Alternativos", Icon = "shield", Locked = false })
+    AddScripts(SATab, {
+        { "Fly🍃", "https://pastefy.app/IHIgGN9b/raw" },
+        { "Coquette Hub🎀", "https://rawscripts.net/raw/Brookhaven-RP-Coquette-Hub-41921" },
+        { "Hexagon Client🔘", "https://raw.githubusercontent.com/nxvap/hexagon/refs/heads/main/brookhaven" },
+        { "Script De Emotes🕺", "https://pastefy.app/lAdApmz4/raw" },
+    })
+
+    local ConfigTab = MainWindow:Tab({ Title = "Configurações", Icon = "cog", Locked = false })
+    local Camera = workspace.CurrentCamera
+    workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function() Camera = workspace.CurrentCamera end)
+
+    ConfigTab:Slider({
+        Title = "FOV", Step = 1, Value = { Min = 20, Max = 120, Default = 70 },
+        Callback = function(v) if Camera then Camera.FieldOfView = v end end,
+    })
+    ConfigTab:Slider({
+        Title = "Velocidade (Speed)", Step = 1, Value = { Min = 16, Max = 200, Default = 16 },
+        Callback = function(v)
+            local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if h then h.WalkSpeed = v end
+        end,
+    })
+    ConfigTab:Slider({
+        Title = "Força de Pulo (Jump)", Step = 1, Value = { Min = 50, Max = 300, Default = 50 },
+        Callback = function(v)
+            local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if h then h.JumpPower = v end
+        end,
+    })
+    ConfigTab:Button({
+        Title = "Destruir Interface🔨", Locked = false,
+        Callback = function() MainWindow:Destroy() end,
+    })
+
+    print("✅ Legendary Hub carregado!")
+end
+
+------------------------------------------------------------
+-- CORES DA UI
+------------------------------------------------------------
+local ColorNames = {}
+local ColorMap = {}
+do
+    local palette = {
+        "Vermelho", "Coral", "Laranja", "Âmbar", "Dourado", "Amarelo", "Limão", "Verde Neon",
+        "Verde", "Esmeralda", "Menta", "Turquesa", "Ciano", "Azul Céu", "Azul", "Azul Royal",
+        "Índigo", "Violeta", "Roxo", "Magenta", "Rosa", "Pink", "Carmim", "Salmão",
+    }
+    for i = 1, 120 do
+        local c = Color3.fromHSV((i - 1) / 120, 0.7, 1)
+        local label = string.format("%s %03d", palette[((i - 1) % #palette) + 1], i)
+        table.insert(ColorNames, label)
+        ColorMap[label] = c
+    end
+end
+
+------------------------------------------------------------
+-- BUILD HUB
+------------------------------------------------------------
+local BackgroundImageId = ""
+local themeCounter = 0
+
+local function BuildHub()
+    local WindUI = LoadWindUI()
+    if not WindUI then error("WindUI não pôde ser carregada") end
+
+    SetGlobal("EnderHub_WindUI", WindUI)
+
+    local function MakeWindow(withBg)
+        local cfg = {
+            Title = "Ender Hub",
+            Icon = "biohazard",
+            Author = "by Dreyko",
+            Folder = "EnderHub",
+            Size = UDim2.fromOffset(600, 460),
+            Transparent = true,
+            Theme = "Dark",
+            Resizable = true,
+            SideBarWidth = 200,
+            HideSearchBar = true,
+            ScrollBarEnabled = true,
+            KeySystem = {
+                Enabled = true,
+                Title = "Key System",
+                Subtitle = "Insira a key para acessar",
+                Key = { "2002brasil" },
+                SaveKey = false,
+                SaveKeyLocal = false,
+                SaveKeyName = "EnderHubKey",
+                Notify = true,
+                Icon = "key",
+            },
+        }
+        if withBg and BackgroundImageId ~= "" then
+            cfg.Background = "rbxassetid://" .. BackgroundImageId
+            cfg.BackgroundImageTransparency = 0.35
+        end
+        return WindUI:CreateWindow(cfg)
+    end
+
+    local okWin, Window = pcall(MakeWindow, true)
+    if not okWin or not Window then
+        warn("[EnderHub] Janela com fundo falhou: " .. tostring(Window))
+        okWin, Window = pcall(MakeWindow, false)
+    end
+    if not okWin or not Window then error("Não foi possível criar a janela: " .. tostring(Window)) end
+
+    print("[EnderHub] ✓ Janela criada")
+
+    local tagsList = {}
+    local function CreateTag(t, i, c)
+        local ok, o = pcall(function()
+            return Window:Tag({ Title = t, Icon = i, Color = c, Radius = 0 })
+        end)
+        if ok and o then table.insert(tagsList, o) end
+    end
+
+    CreateTag("v1.6.6", "biohazard", Accent)
+    CreateTag("Brasil", "flag", Accent)
+    CreateTag("Apelão", "zap", Accent)
+
+    local function SetTagsColor(newColor)
+        for _, tag in ipairs(tagsList) do
+            pcall(function()
+                if tag.SetColor then tag:SetColor(newColor) end
+            end)
+        end
+    end
+
+    -- ABAS (com pcall individual)
+    local MainTab, LegendaryTab, HelpTab, CreditsTab
+
+    pcall(function() MainTab = Window:Tab({ Title = "Início", Icon = "home" }) end)
+    pcall(function() LegendaryTab = Window:Tab({ Title = "Legendary Atravessar", Icon = "ghost" }) end)
+    pcall(function() HelpTab = Window:Tab({ Title = "Dúvidas", Icon = "circle-help" }) end)
+    pcall(function() CreditsTab = Window:Tab({ Title = "Créditos", Icon = "sparkles" }) end)
+
+    print("[EnderHub] ▶ Abas:",
+        MainTab and "Início✓" or "Início✗",
+        LegendaryTab and "Legendary✓" or "Legendary✗",
+        HelpTab and "Dúvidas✓" or "Dúvidas✗",
+        CreditsTab and "Créditos✓" or "Créditos✗"
+    )
+
+    ----------------------------------------------------------
+    -- ABA DÚVIDAS
+    ----------------------------------------------------------
+    if HelpTab then
+        pcall(function()
+            HelpTab:Paragraph({
+                Title = "Tem dúvidas?",
+                Desc = "Fale com os donos do Ender Hub! Copie os contatos abaixo.",
+                Image = "circle-help",
+            })
+        end)
+
+        pcall(function()
+            HelpTab:Button({
+                Title = "📋 Copiar Discord",
+                Desc = "Discord: " .. DISCORD_HANDLE,
+                Callback = function()
+                    local ok = CopyToClipboard(DISCORD_HANDLE)
+                    if ok then
+                        CustomNotify({ Title = "Copiado!", Content = "Discord: " .. DISCORD_HANDLE, Icon = "💬", Duration = 3 })
+                    else
+                        CustomNotify({ Title = "Erro ao copiar", Content = "Executor sem setclipboard.", Icon = "❌", Color = Danger, Duration = 4 })
+                    end
+                end,
+            })
+        end)
+
+        pcall(function()
+            HelpTab:Button({
+                Title = "📋 Copiar TikTok",
+                Desc = "TikTok: " .. TIKTOK_HANDLE,
+                Callback = function()
+                    local ok = CopyToClipboard(TIKTOK_HANDLE)
+                    if ok then
+                        CustomNotify({ Title = "Copiado!", Content = "TikTok: " .. TIKTOK_HANDLE, Icon = "🎵", Duration = 3 })
+                    else
+                        CustomNotify({ Title = "Erro ao copiar", Content = "Executor sem setclipboard.", Icon = "❌", Color = Danger, Duration = 4 })
+                    end
+                end,
+            })
+        end)
+
+        pcall(function()
+            HelpTab:Button({
+                Title = "📋 Copiar os dois juntos",
+                Desc = "Copia Discord + TikTok de uma vez",
+                Callback = function()
+                    local text = string.format("Discord: %s\nTikTok: %s", DISCORD_HANDLE, TIKTOK_HANDLE)
+                    local ok = CopyToClipboard(text)
+                    if ok then
+                        CustomNotify({ Title = "Copiado!", Content = "Discord + TikTok copiados.", Icon = "📋", Duration = 3 })
+                    else
+                        CustomNotify({ Title = "Erro ao copiar", Content = "Executor sem setclipboard.", Icon = "❌", Color = Danger, Duration = 4 })
+                    end
+                end,
+            })
+        end)
+
+        pcall(function()
+            HelpTab:Paragraph({
+                Title = "Sobre o Hub",
+                Desc = "Ender Hub é feito por Loved Filho (UI), Dreyko (Script Maker) e teddy (Developer).",
+                Image = "info",
+            })
+        end)
+    end
+
+    ----------------------------------------------------------
+    -- ABA LEGENDARY
+    ----------------------------------------------------------
+    if LegendaryTab then
+        pcall(function()
+            LegendaryTab:Paragraph({
+                Title = "Legendary Atravessar",
+                Desc = "Clique no botão abaixo para abrir o Legendary Hub (ele pede a key ao abrir).",
+                Image = "ghost",
+            })
+        end)
+        pcall(function()
+            LegendaryTab:Button({
+                Title = "Executar Legendary",
+                Desc = "Abre o Legendary Hub",
+                Callback = function()
+                    local ok, err = pcall(RunLegendary)
+                    if ok then
+                        CustomNotify({ Title = "Legendary", Content = "Legendary Hub executado!", Icon = "👻", Duration = 3 })
+                    else
+                        warn("[EnderHub] Erro Legendary: " .. tostring(err))
+                        CustomNotify({ Title = "Legendary • Erro", Content = tostring(err):sub(1, 90), Icon = "❌", Color = Danger, Duration = 8 })
+                    end
+                end,
+            })
+        end)
+    end
+
+    ----------------------------------------------------------
+    -- ABA INÍCIO
+    ----------------------------------------------------------
+    if MainTab then
+        pcall(function()
+            MainTab:Paragraph({
+                Title = "Ender Hub",
+                Desc = "Hub carregado com sucesso. Use as abas do menu lateral para navegar pelos recursos.",
+                Image = "biohazard",
+            })
+        end)
+
+        pcall(function()
+            MainTab:Toggle({
+                Title = "Ativar efeitos visuais",
+                Desc = "Liga/desliga efeitos visuais do Hub",
+                Default = false,
+                Callback = function(state)
+                    CustomNotify({
+                        Title = "Ender Hub",
+                        Content = state and "Efeitos visuais ativados" or "Efeitos visuais desativados",
+                        Icon = state and "✨" or "🚫",
+                        Duration = 3,
+                    })
+                end,
+            })
+        end)
+
+        -- SPEED 24
+        local speedConn, speedEnabled, originalSpeed = nil, false, 16
+        pcall(function()
+            MainTab:Toggle({
+                Title = "Speed 24 Disfarçado",
+                Desc = "Funciona tanto Pc e mobile",
+                Default = false,
+                Callback = function(state)
+                    speedEnabled = state
+                    if speedConn then speedConn:Disconnect(); speedConn = nil end
+                    if state then
+                        local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                        if h then originalSpeed = h.WalkSpeed end
+                        speedConn = RunService.RenderStepped:Connect(function()
+                            local h2 = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                            if speedEnabled and h2 then h2.WalkSpeed = 24 end
+                        end)
+                        CustomNotify({ Title = "Speed Disfarçado", Content = "Speed 24 ativado!", Icon = "⚡", Duration = 3 })
+                    else
+                        local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                        if h then h.WalkSpeed = originalSpeed end
+                        CustomNotify({ Title = "Speed Disfarçado", Content = "Velocidade normal restaurada.", Icon = "🛑", Duration = 3 })
+                    end
+                end,
+            })
+        end)
+
+        -- ANTI-PULO
+        local jumpConn, antiJumpEnabled, oJP, oJH = nil, false, 50, 7.2
+        pcall(function()
+            MainTab:Toggle({
+                Title = "Anti-Pulo",
+                Desc = "Funciona tanto Pc e Mobile",
+                Default = false,
+                Callback = function(state)
+                    antiJumpEnabled = state
+                    if jumpConn then jumpConn:Disconnect(); jumpConn = nil end
+                    if state then
+                        local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                        if h then
+                            if h.UseJumpPower then oJP = h.JumpPower else oJH = h.JumpHeight end
+                        end
+                        jumpConn = RunService.RenderStepped:Connect(function()
+                            local h2 = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                            if antiJumpEnabled and h2 then
+                                if h2.UseJumpPower then h2.JumpPower = 0 else h2.JumpHeight = 0 end
+                            end
+                        end)
+                        CustomNotify({ Title = "Anti-Pulo", Content = "Pulo desativado!", Icon = "🚫", Duration = 3 })
+                    else
+                        local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                        if h then
+                            if h.UseJumpPower then h.JumpPower = oJP else h.JumpHeight = oJH end
+                        end
+                        CustomNotify({ Title = "Anti-Pulo", Content = "Pulo restaurado.", Icon = "🦘", Duration = 3 })
+                    end
+                end,
+            })
+        end)
+
+        -- COR DA UI
+        pcall(function()
+            MainTab:Dropdown({
+                Title = "Cor da UI",
+                Desc = "Personalize o Hub e as Tags",
+                Values = ColorNames,
+                Callback = function(selected)
+                    local key = selected
+                    if type(selected) == "table" then key = selected[1] or selected[#selected] end
+                    if type(key) ~= "string" then return end
+                    local chosen = ColorMap[key]
+                    if not chosen then return end
+
+                    themeCounter += 1
+                    local themeName = "EnderCustom" .. themeCounter
+
+                    pcall(function()
+                        if WindUI.AddTheme then
+                            WindUI:AddTheme({
+                                Name = themeName,
+                                Accent = chosen,
+                                Dialog = Color3.fromRGB(20, 20, 24),
+                                Outline = chosen,
+                                Text = Color3.fromRGB(240, 240, 240),
+                                Placeholder = Color3.fromRGB(150, 150, 150),
+                                Background = Color3.fromRGB(15, 15, 18),
+                                Button = chosen,
+                                Icon = chosen,
+                            })
+                        end
+                    end)
+                    pcall(function()
+                        if WindUI.SetTheme then WindUI:SetTheme(themeName) end
+                    end)
+
+                    SetTagsColor(chosen)
+                    CustomNotify({ Title = "Ender Hub", Content = "Cor alterada para " .. key, Icon = "🎨", Color = chosen, Duration = 3 })
+                end,
+            })
+        end)
+    end
+
+    ----------------------------------------------------------
+    -- ABA CRÉDITOS
+    ----------------------------------------------------------
+    if CreditsTab then
+        pcall(function()
+            CreditsTab:Paragraph({ Title = "UI Designer", Desc = "Loved Filho 🎨 — cria o visual da interface.", Image = "paintbrush" })
+        end)
+        pcall(function()
+            CreditsTab:Paragraph({ Title = "Script Maker", Desc = "Dreyko 🖥️ — cria novas funções e recursos.", Image = "code" })
+        end)
+        pcall(function()
+            CreditsTab:Paragraph({ Title = "Script Developer", Desc = "teddy ⚒️ — cria, atualiza e corrige bugs.", Image = "wrench" })
+        end)
+    end
+
+    task.wait(0.3)
+    CustomNotify({
+        Title = "Ender Hub",
+        Content = "Script carregado! Versão v1.6.6 | Key: 2002brasil",
+        Icon = "✅",
+        Duration = 5,
+    })
+end
+
+local function SafeBuildHub()
+    print("[EnderHub] ▶ Construindo hub...")
+    local ok, err = pcall(BuildHub)
+    if not ok then
+        warn("[EnderHub] ✗ Erro ao criar hub: " .. tostring(err))
+        pcall(function()
+            CustomNotify({ Title = "Ender Hub • Erro", Content = tostring(err):sub(1, 90), Icon = "❌", Color = Danger, Duration = 10 })
+        end)
+    else
+        print("[EnderHub] ✓ Hub construído com sucesso!")
+    end
+end
+
+------------------------------------------------------------
+-- INICIALIZAÇÃO
+------------------------------------------------------------
+local function AfterHubBuilt()
+    if not HasFirstRunBeenShown() then
+        print("[EnderHub] ▶ Mostrando popup de primeira vez...")
+        task.wait(0.6)
+        ShowFirstRunPrompt(function(wantsToCopy)
+            if wantsToCopy then
+                local text = string.format("Discord: %s\nTikTok: %s", DISCORD_HANDLE, TIKTOK_HANDLE)
+                local ok = CopyToClipboard(text)
+                if ok then
+                    CustomNotify({ Title = "Contatos copiados!", Content = "Discord e TikTok copiados.", Icon = "📋", Duration = 5 })
+                else
+                    CustomNotify({ Title = "Não foi possível copiar", Content = "Use a aba Dúvidas do Hub.", Icon = "❌", Color = Danger, Duration = 6 })
+                end
+            end
+            SaveFirstRunShown()
+        end)
+    else
+        print("[EnderHub] ▶ Popup primeira vez já mostrado antes.")
+    end
+end
+
+local function StartHub()
+    print("[EnderHub] ▶ StartHub iniciado")
+    CustomNotify({
+        Title = "Ender Hub",
+        Content = "A UI pode demorar um pouco para carregar. Aguarde com calma! ⏳",
+        Icon = "⚠️",
+        Color = Warn,
+        Duration = 6,
+    })
+    task.wait(1)
+
+    local ok, err = pcall(function()
+        ShowLoadingScreen(function()
+            print("[EnderHub] ▶ Loading terminou")
+            SafeBuildHub()
+            AfterHubBuilt()
+        end)
+    end)
+    if not ok then
+        warn("[EnderHub] ✗ Erro na loading: " .. tostring(err))
+        SafeBuildHub()
+        AfterHubBuilt()
+    end
+end
+
+print("[EnderHub] ▶ Verificando whitelist salva...")
+if HasAcceptedBefore() then
+    print("[EnderHub] ▶ Já aceitou antes — pulando prompt")
+    StartHub()
+else
+    print("[EnderHub] ▶ Mostrando prompt de whitelist...")
+    ShowWhitelistPrompt(function(accepted)
+        if not accepted then
+            CustomNotify({ Title = "Ender Hub", Content = "Acesso recusado.", Icon = "🚫", Color = Color3.fromRGB(220, 60, 70), Duration = 4 })
+            return
+        end
+        SaveAccepted()
+        StartHub()
+    end)
+end
